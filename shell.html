@@ -1,0 +1,554 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { --signal:#34F003; --ink:#0a0a0b; --muted:#6b6b70; --line:rgba(255,255,255,.07); --card:rgba(255,255,255,.035); }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; background:transparent; overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","SF Pro Text",system-ui,sans-serif; -webkit-user-select:none; color:#f4f4f5; }
+  .app { display:flex; height:100vh; }
+  .rail { width:60px; flex:0 0 60px; background:rgba(10,11,9,.55); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; padding-top:40px; -webkit-app-region:drag; }
+  .brand { width:22px; height:27px; margin-bottom:26px; filter:drop-shadow(0 0 12px rgba(52,240,3,.5)); -webkit-app-region:no-drag; cursor:pointer; }
+  .nav { display:flex; flex-direction:column; gap:6px; -webkit-app-region:no-drag; }
+  .item { width:42px; height:42px; border-radius:13px; display:grid; place-items:center; cursor:pointer;
+    color:var(--muted); transition:color .18s cubic-bezier(.2,.8,.2,1), background .18s, transform .12s; position:relative; }
+  .item svg { width:19px; height:19px; stroke:currentColor; stroke-width:1.6; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .item:hover { color:#f4f4f5; background:rgba(255,255,255,.06); } .item:active { transform:scale(.93); }
+  .item.on { color:var(--signal); background:rgba(52,240,3,.1); }
+  .item.on::before { content:""; position:absolute; left:-10px; top:12px; bottom:12px; width:2.5px; border-radius:3px; background:var(--signal); box-shadow:0 0 8px rgba(52,240,3,.6); }
+  .tip { position:absolute; left:52px; top:50%; transform:translateY(-50%) translateX(-6px); opacity:0; background:rgba(24,24,27,.92); backdrop-filter:blur(12px); border:1px solid var(--line); color:#f4f4f5; font-size:11px; font-weight:500; padding:5px 10px; border-radius:9px; white-space:nowrap; pointer-events:none; transition:opacity .16s, transform .16s; box-shadow:0 10px 30px rgba(0,0,0,.55); z-index:20; }
+  .item:hover .tip { opacity:1; transform:translateY(-50%); }
+  .sep { width:22px; height:1px; background:var(--line); margin:8px 0; -webkit-app-region:no-drag; }
+  .spacer { flex:1; } .foot { display:flex; flex-direction:column; align-items:center; gap:12px; padding-bottom:16px; -webkit-app-region:no-drag; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--signal); box-shadow:0 0 9px rgba(52,240,3,.8); }
+  .content { flex:1; position:relative; }
+
+  /* HOME = chat */
+  #home,#files { position:absolute; inset:0; z-index:3; background:var(--ink); background-image:radial-gradient(70% 55% at 50% 0%, rgba(52,240,3,.10), transparent 72%); }
+  #home.hide,#files.hide { display:none; }
+  /* William Blake "Ancient of Days" blended into the chat background — the terminal's signature */
+  .blake { position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:url('assets/blake-ancient.jpg') center 12% / cover no-repeat;
+    opacity:.14; filter:grayscale(1) contrast(1.15);
+    -webkit-mask-image:radial-gradient(75% 60% at 50% 8%, rgba(0,0,0,.85), transparent 72%); }
+  .chat { position:relative; z-index:1; }
+  /* model picker with provider logos */
+  .modelpick { position:relative; flex:0 0 auto; }
+  .mp-btn { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.06); color:#c7c7cc; border:1px solid var(--line); border-radius:11px; padding:7px 10px; font-size:11.5px; font-family:inherit; cursor:pointer; white-space:nowrap; max-width:210px; }
+  .mp-btn:hover { color:#f4f4f5; }
+  #mp-label { max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#f4f4f5; font-weight:500; }
+  .mp-badge { width:18px; height:18px; border-radius:5px; display:grid; place-items:center; flex:0 0 auto; }
+  .mp-badge svg { width:12px; height:12px; display:block; }
+  .mp-caret { color:#6b6b70; font-size:9px; flex:0 0 auto; }
+  .mp-menu { position:absolute; bottom:calc(100% + 8px); right:0; min-width:210px; max-height:340px; overflow:auto; background:rgba(20,20,23,.97); backdrop-filter:blur(20px); border:1px solid var(--line); border-radius:14px; padding:5px; box-shadow:0 16px 44px rgba(0,0,0,.6); display:none; z-index:40; }
+  .mp-menu.on { display:block; }
+  .mp-item { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:9px; cursor:pointer; font-size:12.5px; color:#d4d4d8; white-space:nowrap; }
+  .mp-item:hover { background:rgba(255,255,255,.05); color:#fff; } .mp-item.sel { color:var(--signal); }
+  .mp-item .mp-badge { width:20px; height:20px; } .mp-item .mp-badge svg{width:13px;height:13px}
+  .drag { position:absolute; top:0; left:0; right:0; height:40px; -webkit-app-region:drag; z-index:1; }
+  .chat { display:flex; flex-direction:column; height:100%; max-width:820px; margin:0 auto; }
+  .msgs { flex:1; overflow:auto; padding:56px 28px 12px; display:flex; flex-direction:column; gap:16px; }
+  .chat.empty .msgs { justify-content:center; }
+  .hero { text-align:center; margin-bottom:6px; transition:opacity .3s; }
+  .chat:not(.empty) .hero { display:none; }
+  .hero .g { font-size:13px; color:var(--muted); }
+  .hero .h { font-size:32px; font-weight:700; letter-spacing:-.025em; margin-top:6px; } .hero .h b { color:var(--signal); }
+  .msg { display:flex; gap:10px; animation:rise .4s cubic-bezier(.2,.85,.25,1) both; }
+  @keyframes rise { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+  .msg.u { justify-content:flex-end; }
+  .bub { max-width:80%; padding:11px 15px; border-radius:16px; font-size:14.5px; line-height:1.55; }
+  .msg.u .bub { background:rgba(52,240,3,.12); border:1px solid rgba(52,240,3,.22); color:#eafff0; border-bottom-right-radius:5px; }
+  .msg.a .bub { background:var(--card); border:1px solid var(--line); color:#e8e8ea; border-bottom-left-radius:5px; }
+  .bub h2{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--signal);margin:10px 0 4px} .bub strong{color:#fff} .bub ul{margin:6px 0 6px 18px} .bub li{margin:3px 0} .bub p{margin:7px 0}
+  .av { width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;background:rgba(52,240,3,.12);border:1px solid rgba(52,240,3,.25); }
+  .av svg{width:14px;height:16px;fill:var(--signal)}
+  .typing span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--signal);margin:0 1.5px;animation:blink 1.2s infinite both}
+  .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  .cursor{color:var(--signal);animation:blink 1s steps(2) infinite;font-weight:400}
+  /* chart the agent "opens" — rendered INSIDE its message bubble */
+  .cchart { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:rgba(0,0,0,.22); margin-bottom:11px; }
+  .cc-head { display:flex; align-items:center; gap:9px; padding:11px 13px 6px; }
+  .cc-head img { width:20px;height:20px;border-radius:6px;background:#fff;object-fit:contain }
+  .cc-sym { font-family:"SF Pro Display"; font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .cc-price { margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; font-size:14px; }
+  .cc-chg { font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .cc-svg { display:block; width:100%; height:110px; }
+  .chips { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:16px; } .chat:not(.empty) .chips{display:none}
+  /* skills row */
+  .skills { display:flex; flex-wrap:wrap; gap:7px; padding:0 28px 8px; }
+  .skill { display:flex; align-items:center; gap:6px; padding:6px 11px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:#a1a1aa; font-size:11.5px; cursor:pointer; transition:all .15s; }
+  .skill.on { border-color:rgba(52,240,3,.45); color:var(--signal); background:rgba(52,240,3,.08); } .skill:hover{color:#f4f4f5}
+  .chip { padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:var(--card); color:#c7c7cc; font-size:12.5px; font-weight:500; cursor:pointer; transition:all .15s; }
+  .chip:hover { border-color:rgba(52,240,3,.4); color:#f4f4f5; transform:translateY(-1px); }
+
+  /* glassmorphism composer */
+  .composer { padding:12px 28px 22px; position:relative; }
+  /* slash-command palette (type "/" in the chat) */
+  .slashmenu { position:absolute; left:28px; right:28px; bottom:calc(100% - 4px); background:rgba(20,20,23,.98); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--line); border-radius:14px; padding:6px; box-shadow:0 16px 44px rgba(0,0,0,.6); display:none; max-height:300px; overflow:auto; z-index:50; }
+  .slashmenu.on { display:block; }
+  .slash-head { font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); padding:6px 10px 4px; }
+  .slash-item { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:10px; cursor:pointer; }
+  .slash-item.sel, .slash-item:hover { background:rgba(52,240,3,.1); }
+  .slash-item .si { width:22px; text-align:center; font-size:15px; flex:0 0 auto; }
+  .slash-item .sc { font-family:ui-monospace,"SF Mono",monospace; font-size:12.5px; color:var(--signal); flex:0 0 auto; min-width:104px; }
+  .slash-item .sd { color:var(--muted); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slash-item.sel .sd, .slash-item:hover .sd { color:#c7c7cc; } .slash-item .sx { margin-left:auto; font-size:10px; color:var(--signal); opacity:.7; }
+  .cbar { display:flex; align-items:center; gap:10px; padding:7px 7px 7px 18px; border-radius:20px;
+    background:rgba(255,255,255,.05); backdrop-filter:blur(28px) saturate(1.4); -webkit-backdrop-filter:blur(28px) saturate(1.4);
+    border:1px solid rgba(52,240,3,.22); box-shadow:0 8px 40px -8px rgba(52,240,3,.18), inset 0 1px 0 rgba(255,255,255,.06); transition:border-color .2s, box-shadow .2s; }
+  .cbar:focus-within { border-color:rgba(52,240,3,.5); box-shadow:0 8px 44px -6px rgba(52,240,3,.32), inset 0 1px 0 rgba(255,255,255,.08); }
+  .cbar .ic { width:18px;height:18px;stroke:var(--signal);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto; }
+  .micbtn { width:34px;height:34px;flex:0 0 auto;display:grid;place-items:center;border:0;border-radius:11px;background:transparent;cursor:pointer;transition:background .15s,transform .1s;padding:0; }
+  .micbtn svg { width:18px;height:18px;stroke:var(--signal);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+  .micbtn:hover { background:rgba(52,240,3,.12); } .micbtn:active { transform:scale(.92); }
+  .micbtn.rec { background:rgba(255,90,90,.16); animation:micpulse 1.1s ease-in-out infinite; } .micbtn.rec svg { stroke:#ff5a5a; }
+  .micbtn.busy { background:rgba(52,240,3,.1); } .micbtn.busy svg { animation:spin 1s linear infinite; }
+  @keyframes micpulse { 0%,100%{box-shadow:0 0 0 0 rgba(255,90,90,.4)} 50%{box-shadow:0 0 0 6px rgba(255,90,90,0)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .cbar input { flex:1; background:transparent;border:0;outline:0;color:#f4f4f5;font-size:16px;font-weight:500;letter-spacing:-.01em; }
+  .cbar input::placeholder { color:#5c5c62; }
+  .cbar select { background:rgba(0,0,0,.3); color:#c7c7cc; border:1px solid var(--line); border-radius:11px; padding:8px 8px; font-size:11px; font-family:inherit; outline:0; cursor:pointer; }
+  /* send button only — scoped to #go so it never cascades onto the mic / model-picker buttons */
+  #go { flex:0 0 auto; width:40px;height:40px; display:grid;place-items:center; border:0;border-radius:13px;background:var(--signal);color:#04140a; cursor:pointer; transition:opacity .15s, transform .1s; }
+  #go:hover{opacity:.92} #go:active{transform:scale(.93)}
+  #go svg{width:17px;height:17px;stroke:#04140a;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .foot-note { text-align:center; margin-top:8px; font-size:10.5px; color:var(--muted); }
+
+  /* files */
+  .fwrap { max-width:820px; margin:0 auto; padding:64px 32px; }
+  .drop { margin-top:22px; border:1.5px dashed rgba(255,255,255,.14); border-radius:20px; padding:48px; text-align:center; transition:all .2s; cursor:pointer; }
+  .drop.over { border-color:var(--signal); background:rgba(52,240,3,.06); } .drop .di{font-size:34px} .drop .dt{margin-top:10px;font-size:15px;font-weight:600} .drop .dd{margin-top:4px;color:var(--muted);font-size:12.5px}
+  .box { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; }
+  .row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:13.5px; } .row:last-child{border-bottom:0}
+  .up{color:var(--signal)} .down{color:#ff5a5a} .big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums} .muted{color:var(--muted);font-size:12.5px;line-height:1.5}
+  h3.bh{font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--muted);font-weight:600;margin-bottom:10px}
+  #account,#connectors{position:absolute;inset:0;z-index:3;background:var(--ink);overflow:auto} #account.hide,#connectors.hide{display:none}
+  .cgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cc{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02);cursor:pointer;transition:border-color .15s,background .15s}
+  .cc:hover{border-color:rgba(52,240,3,.3)} .cc.on{border-color:rgba(52,240,3,.4);background:rgba(52,240,3,.06)}
+  .cc .ci{font-size:20px;flex:0 0 auto;width:26px;text-align:center} .cc .cn{font-weight:600;font-size:13.5px} .cc .cd{color:var(--muted);font-size:11.5px;margin-top:1px;line-height:1.35}
+  .cc .sw{margin-left:auto;flex:0 0 auto;width:34px;height:20px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05);position:relative;transition:background .18s,border-color .18s}
+  .cc.on .sw{background:rgba(52,240,3,.25);border-color:rgba(52,240,3,.5)} .cc .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8a8a90;transition:transform .18s,background .18s} .cc.on .sw::after{transform:translateX(14px);background:var(--signal)}
+  .mcp-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.02)}
+  .mcp-row .md{min-width:0;flex:1} .mcp-row .mn{font-weight:600;font-size:13px} .mcp-row .mu{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mcp-sug{color:var(--signal);cursor:pointer;text-decoration:underline;text-underline-offset:2px} .mcp-sug:hover{opacity:.8}
+  @media(max-width:720px){.cgrid{grid-template-columns:1fr}}
+  .fld{margin:10px 0} .fld label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px}
+  .fld input,.fld select{width:100%;background:#0a0a0b;border:1px solid var(--line);border-radius:11px;padding:10px 12px;color:#f4f4f5;font-size:13.5px;font-family:inherit;outline:0}
+  .fld input:focus,.fld select:focus{border-color:rgba(52,240,3,.4)}
+  button.save{padding:10px 18px;border:0;border-radius:12px;background:var(--signal);color:#04140a;font-weight:700;font-size:12.5px;cursor:pointer} button.save:hover{opacity:.92}
+  button.ghost{padding:10px 16px;border:1px solid var(--line);border-radius:12px;background:transparent;color:#c7c7cc;font-size:12.5px;cursor:pointer} button.ghost:hover{color:#f4f4f5;border-color:rgba(52,240,3,.3)}
+
+  webview { position:absolute; inset:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:opacity .35s; } webview.show{opacity:1;pointer-events:auto}
+  .load { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; background:var(--ink); z-index:6; transition:opacity .5s; } .load.hide{opacity:0;pointer-events:none}
+  .load svg { width:36px;height:44px; filter:drop-shadow(0 0 16px rgba(52,240,3,.55)); animation:breathe 2s ease-in-out infinite; } @keyframes breathe{0%,100%{opacity:.95;transform:translateY(0)}50%{opacity:.55;transform:translateY(-2px)}}
+  .load .b{width:120px;height:2px;background:rgba(255,255,255,.09);border-radius:2px;overflow:hidden} .load .b>i{display:block;height:100%;width:38%;background:var(--signal);border-radius:2px;animation:sl 1.15s cubic-bezier(.4,0,.2,1) infinite} @keyframes sl{0%{transform:translateX(-130%)}100%{transform:translateX(330%)}}
+  .load .cap{font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+  .load .retry{margin-top:6px;padding:8px 16px;border:1px solid rgba(52,240,3,.4);background:rgba(52,240,3,.1);color:var(--signal);border-radius:12px;font:600 11px system-ui;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;display:none}
+  .load.err .cap{display:none} .load.err .b{display:none} .load.err .retry{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="rail">
+    <svg class="brand" id="brand" viewBox="0 0 580 696" fill="#34F003"><path d="M 456 696 L 318 558 L 178 696 L 0 517 L 2 166 L 180 0 L 182 453 L 276 546 L 278 166 L 458 1 L 458 453 L 580 574 Z"/></svg>
+    <div class="nav">
+      <div class="item on" data-nav="home" title="Agent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/><path d="M9 15c1 1 5 1 6 0"/></svg><span class="tip">Agent</span></div>
+      <div class="item" data-nav="view" data-view="research" title="Research"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M11 6a5 5 0 0 1 5 5"/><path d="m20 20-3.5-3.5"/></svg><span class="tip">Research</span></div>
+      <div class="item" data-nav="files" title="Files"><svg viewBox="0 0 24 24"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M13 3v5h5"/></svg><span class="tip">Files</span></div>
+      <div class="item" data-nav="connectors" title="Connectors"><svg viewBox="0 0 24 24"><path d="M9 2v5M15 2v5M7 7h10v3a5 5 0 0 1-10 0z"/><path d="M12 15v3a3 3 0 0 0 3 3h1"/></svg><span class="tip">Connectors</span></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="foot">
+      <div class="item" data-nav="account" title="Account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg><span class="tip">Account</span></div>
+      <div class="item" data-nav="reload" title="Reload"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-1.7 5"/><path d="M20 4v6h-6"/></svg><span class="tip">Reload</span></div>
+      <div class="dot" title="online"></div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- HOME chat -->
+    <div id="home"><div class="blake"></div><div class="drag"></div>
+      <div class="chat empty" id="chat">
+        <div class="msgs" id="msgs">
+          <div class="hero"><div class="g" id="greeting">Welcome back</div><div class="h">Talk to <b>Urizen</b></div></div>
+          <div class="chips" id="chips"></div>
+        </div>
+        <div class="composer">
+          <div class="slashmenu" id="slash"></div>
+          <div class="skills" id="skills"></div>
+          <div class="cbar">
+            <button id="mic" class="micbtn" title="Hold to speak — local, on-device transcription"><svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg></button>
+            <input id="q" placeholder="Ask Urizen anything — a ticker, the market, a strategy…" autocomplete="off" spellcheck="false" />
+            <div class="modelpick" id="modelpick">
+              <button class="mp-btn" id="mp-btn"><span class="mp-badge" id="mp-badge">◆</span><span id="mp-label">Fast</span><span class="mp-caret">▾</span></button>
+              <div class="mp-menu" id="mp-menu"></div>
+            </div>
+            <button id="go" title="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+          <div class="foot-note">Type <b style="color:#c7c7cc">/</b> for commands · grounded in live market data · free — add a key for stronger models</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILES -->
+    <div id="files" class="hide"><div class="drag"></div>
+      <div class="fwrap">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.02em">Analyse a file</div>
+        <div class="muted" style="margin-top:6px">Drop a CSV of your trades or portfolio. Parsed <b style="color:#f4f4f5">on your Mac</b> — nothing is uploaded.</div>
+        <div class="drop" id="drop"><div class="di">📄</div><div class="dt">Drop a CSV here, or click to choose</div><div class="dd">columns like symbol · side · pnl · entry · exit are auto-detected</div><input type="file" id="file" accept=".csv,text/csv" hidden /></div>
+        <div id="csvout"></div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT -->
+    <div id="account" class="hide"><div class="drag"></div>
+      <div class="fwrap">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.02em">Account &amp; settings</div>
+        <div class="muted" style="margin-top:6px">Everything is stored on your Mac. Your API key backs the home chat &amp; research, and syncs to the terminal.</div>
+        <div class="box" style="margin-top:22px">
+          <h3 class="bh">✦ Intelligence</h3>
+          <!-- saved key card -->
+          <div id="ai-saved" style="display:none">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(52,240,3,.25);background:rgba(52,240,3,.06);border-radius:12px">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--signal);box-shadow:0 0 8px rgba(52,240,3,.7)"></span>
+              <div style="min-width:0"><div style="font-weight:600;font-size:13.5px" id="ai-saved-name">My key</div><div class="muted" id="ai-saved-sub">provider · ••••1234 · model</div></div>
+              <div style="margin-left:auto;display:flex;gap:8px"><button class="ghost" id="ai-change">Change</button><button class="ghost" id="ai-clear">Remove</button></div>
+            </div>
+            <div class="muted" style="margin-top:10px">Your home chat &amp; research now run on this model. Stored locally on your Mac; synced to the terminal.</div>
+          </div>
+          <!-- form -->
+          <div id="ai-form">
+            <div class="muted" style="margin-bottom:12px">Paste any key — we detect the provider automatically. Then pick <b style="color:#f4f4f5">any of that provider's models</b> right in the chat. Without a key, the home runs on free models.</div>
+            <div class="fld"><label>Name (optional)</label><input id="ai-name" placeholder="e.g. My OpenRouter key" autocomplete="off" spellcheck="false" /></div>
+            <div class="fld"><label>API key</label><input id="ai-key" type="password" placeholder="sk-or-… (OpenRouter) · sk-ant-… (Claude) · sk-… (OpenAI) · AIza… (Gemini)" autocomplete="off" spellcheck="false" /></div>
+            <div id="ai-detected" class="muted" style="margin:2px 0 4px;display:none"></div>
+            <input type="hidden" id="ai-provider" value="openrouter" />
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px"><button class="save" id="ai-save">Save key</button><button class="ghost" id="ai-cancel" style="display:none">Cancel</button><span id="ai-status" class="muted"></span></div>
+          </div>
+        </div>
+        <div class="box" style="margin-top:14px">
+          <h3 class="bh">↻ Onboarding</h3>
+          <div class="muted" style="margin-bottom:10px">Re-run the welcome flow next time you open the app.</div>
+          <button class="ghost" id="reset-onb">Reset onboarding</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTORS -->
+    <div id="connectors" class="hide"><div class="drag"></div>
+      <div class="fwrap">
+        <div style="font-size:26px;font-weight:700;letter-spacing:-.02em">Connectors</div>
+        <div class="muted" style="margin-top:6px">Data sources &amp; tools your agent can use. Toggle the built-in trading &amp; research feeds, or add your own <b style="color:#f4f4f5">MCP server</b>. Stored on your Mac.</div>
+
+        <div class="box" style="margin-top:22px">
+          <h3 class="bh">◆ Built-in feeds</h3>
+          <div class="muted" style="margin-bottom:12px">What the agent grounds its answers in. Active feeds are pulled live when you ask about a ticker.</div>
+          <div id="conn-grid" class="cgrid"></div>
+        </div>
+
+        <div class="box" style="margin-top:14px">
+          <h3 class="bh">⛓ Your MCP servers &amp; API connectors</h3>
+          <div class="muted" style="margin-bottom:12px">Point the agent at any Model-Context-Protocol server or HTTP tool endpoint — a research API, an on-chain indexer, your broker. Add a name and endpoint; a key is optional.</div>
+          <div id="mcp-list"></div>
+          <div class="fld"><label>Name</label><input id="mcp-name" placeholder="e.g. Polygon market data · my SEC MCP" autocomplete="off" spellcheck="false" /></div>
+          <div style="display:grid;grid-template-columns:1fr 130px;gap:10px">
+            <div class="fld"><label>Endpoint (URL or command)</label><input id="mcp-url" placeholder="https://… or npx -y @scope/mcp-server" autocomplete="off" spellcheck="false" /></div>
+            <div class="fld"><label>Type</label><select id="mcp-kind"><option value="http">HTTP / SSE</option><option value="stdio">Local (stdio)</option></select></div>
+          </div>
+          <div class="fld"><label>API key (optional)</label><input id="mcp-key" type="password" placeholder="stored locally, never synced" autocomplete="off" spellcheck="false" /></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><button class="save" id="mcp-add">Add connector</button><span id="mcp-status" class="muted"></span></div>
+          <div class="muted" style="margin-top:12px;font-size:11.5px">Popular financial MCPs: <span class="mcp-sug" data-n="SEC EDGAR filings" data-u="https://mcp.sec-edgar.dev">SEC EDGAR</span> · <span class="mcp-sug" data-n="CoinGecko crypto" data-u="https://mcp.coingecko.com/sse">CoinGecko</span> · <span class="mcp-sug" data-n="Polygon market data" data-u="https://mcp.polygon.io/sse">Polygon.io</span> · <span class="mcp-sug" data-n="Financial Datasets" data-u="https://mcp.financialdatasets.ai">Financial Datasets</span></div>
+        </div>
+      </div>
+    </div>
+
+    <webview id="wv" src="https://urizenfund.com/terminal?view=research&shell=1" partition="persist:urizen" allowpopups></webview>
+    <div class="load hide" id="load"><svg viewBox="0 0 580 696" fill="#34F003"><path d="M 456 696 L 318 558 L 178 696 L 0 517 L 2 166 L 180 0 L 182 453 L 276 546 L 278 166 L 458 1 L 458 453 L 580 574 Z"/></svg><div class="b"><i></i></div><div class="cap" id="loadcap">loading the desk</div><button class="retry" id="retry">Retry</button></div>
+  </div>
+</div>
+<script>
+  const API='https://urizenfund.com';
+  const wv=document.getElementById('wv'),load=document.getElementById('load'),home=document.getElementById('home'),files=document.getElementById('files');
+  const chat=document.getElementById('chat'),msgs=document.getElementById('msgs'),q=document.getElementById('q');
+  const items=[...document.querySelectorAll('.item[data-nav]')],viewItems=items.filter(i=>i.dataset.nav==='view');
+  const KNOWN='NVDA TSLA AAPL MSFT META AMZN GOOGL PLTR AMD COIN CRCL ORCL BABA INTC MU CRWV SPCX BE USAR SNDK SKHY SPY QQQ SOXL SGOV USO SLV BTC ETH SOL HYPE XRP SUI NEAR'.split(' ');
+  let booted=false;
+  const hide=()=>{booted=true;load.classList.add('hide');load.classList.remove('err');};
+  const showLoad=()=>{load.classList.remove('hide','err');document.getElementById('loadcap').textContent='loading the desk';booted=false;setTimeout(()=>{if(!booted)hide();},9000);};
+  wv.addEventListener('dom-ready',hide); wv.addEventListener('did-finish-load',hide);
+  // page-couldn't-load recovery: show OUR overlay + auto-retry once, then offer Retry
+  let retried=false;
+  wv.addEventListener('did-fail-load',e=>{ if(e.errorCode===-3||!e.isMainFrame) return; if(!retried){ retried=true; document.getElementById('loadcap').textContent='reconnecting…'; load.classList.remove('hide','err'); setTimeout(()=>wv.reload(),1200); } else { load.classList.remove('hide'); load.classList.add('err'); document.getElementById('loadcap').textContent=''; } });
+  document.getElementById('retry').addEventListener('click',()=>{ retried=false; showLoad(); wv.loadURL(API+'/terminal?shell=1'); });
+  wv.addEventListener('did-finish-load',()=>{retried=false;});
+
+  const onTerminal=()=>(wv.getURL()||'').includes('/terminal');
+  function ensureTerminal(cb){ if(onTerminal())return cb(); showLoad(); wv.loadURL(API+'/terminal?shell=1'); const once=()=>{wv.removeEventListener('did-finish-load',once);cb();}; wv.addEventListener('did-finish-load',once); }
+  const dispatch=(n,d)=>wv.executeJavaScript(`window.dispatchEvent(new CustomEvent(${JSON.stringify(n)},{detail:${JSON.stringify(d)}}))`).catch(()=>{});
+  const account=document.getElementById('account'),connectors=document.getElementById('connectors');
+  function panels(){home.classList.add('hide');files.classList.add('hide');account.classList.add('hide');connectors.classList.add('hide');}
+  function showHome(){panels();home.classList.remove('hide');wv.classList.remove('show');items.forEach(i=>i.classList.toggle('on',i.dataset.nav==='home'));}
+  function showFiles(){panels();files.classList.remove('hide');wv.classList.remove('show');items.forEach(i=>i.classList.toggle('on',i.dataset.nav==='files'));}
+  function showAccount(){panels();account.classList.remove('hide');wv.classList.remove('show');items.forEach(i=>i.classList.toggle('on',i.dataset.nav==='account'));loadAI();}
+  function showConnectors(){panels();connectors.classList.remove('hide');wv.classList.remove('show');items.forEach(i=>i.classList.toggle('on',i.dataset.nav==='connectors'));renderConnectors();}
+  function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(24,24,27,.95);backdrop-filter:blur(14px);border:1px solid rgba(52,240,3,.3);color:#f4f4f5;font:600 12.5px -apple-system;padding:11px 18px;border-radius:13px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:99;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none';document.body.appendChild(t);}t.textContent=msg;requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});clearTimeout(t._h);t._h=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2600);}
+  // Spot & Perps need a wallet → open in the real browser (WalletConnect + extensions work natively there,
+  // not in a webview). Research is wallet-free, so it stays in-app.
+  function showView(v){
+    if(v==='spot'||v==='perps'){ const u='https://urizenfund.com/terminal?view='+v; if(window.urizen&&window.urizen.openExternal)window.urizen.openExternal(u);else window.open(u,'_blank'); toast('Opening '+v+' in your browser — connect your wallet there'); return; }
+    panels();wv.classList.add('show');viewItems.forEach(i=>i.classList.toggle('on',i.dataset.view===v));items.forEach(i=>{if(i.dataset.nav!=='view')i.classList.remove('on');});ensureTerminal(()=>dispatch('urizen:nav',v));
+  }
+  function openPage(p){panels();wv.classList.add('show');showLoad();wv.loadURL(API+'/'+p);items.forEach(i=>i.classList.remove('on'));}
+  items.forEach(el=>el.addEventListener('click',()=>{const n=el.dataset.nav; if(n==='home')return showHome(); if(n==='files')return showFiles(); if(n==='connectors')return showConnectors(); if(n==='account')return showAccount(); if(n==='reload'){showLoad();wv.reload();return;} if(n==='ext'){window.open(el.dataset.url,'_blank');return;} if(n==='page')return openPage(el.dataset.page); showView(el.dataset.view);}));
+  document.getElementById('brand').addEventListener('click',showHome);
+
+  // ── account / settings — configure your AI (BYOK), stored locally + synced to the terminal ──
+  // current roster — kept in step with the terminal (src/lib/agents.ts). Frontier models per provider.
+  const MODELS={openrouter:[['anthropic/claude-opus-4.8','Claude Opus 4.8'],['anthropic/claude-sonnet-5','Claude Sonnet 5'],['openai/gpt-5.6-luna-pro','GPT-5.6 Pro'],['x-ai/grok-4.5','Grok 4.5'],['x-ai/grok-4.20','Grok 4.20 · 2M ctx'],['google/gemini-3.5-pro','Gemini 3.5 Pro'],['google/gemini-3.5-flash','Gemini 3.5 Flash'],['deepseek/deepseek-v4-pro','DeepSeek V4 Pro'],['meta-llama/llama-4-maverick','Llama 4 Maverick'],['qwen/qwen3.7-max','Qwen 3.7 Max'],['mistralai/mistral-medium-3-5','Mistral Medium 3.5']],anthropic:[['claude-opus-4-8','Claude Opus 4.8'],['claude-sonnet-5','Claude Sonnet 5'],['claude-haiku-4-5-20251001','Claude Haiku 4.5']],openai:[['gpt-5','GPT-5'],['gpt-5-mini','GPT-5 mini'],['o3','o3']],google:[['gemini-3.5-pro','Gemini 3.5 Pro'],['gemini-3.5-flash','Gemini 3.5 Flash']]};
+  const FREE=[['openai/gpt-oss-20b:free','Fast'],['qwen/qwen3-next-80b-a3b-instruct:free','Balanced'],['deepseek/deepseek-chat-v3:free','Deep']];
+  const PROV={openrouter:{c:'#8b5cf6',l:'OR',name:'OpenRouter'},anthropic:{c:'#d97757',l:'A',name:'Anthropic'},openai:{c:'#10a37f',l:'AI',name:'OpenAI'},google:{c:'#4285f4',l:'G',name:'Gemini'},free:{c:'#34F003',l:'◆',name:'Free'}};
+  const $=id=>document.getElementById(id);
+  const aiProv=$('ai-provider'),aiKey=$('ai-key'),aiStatus=$('ai-status'),aiName=$('ai-name'),aiSaved=$('ai-saved'),aiForm=$('ai-form');
+  function getAI(){try{return JSON.parse(localStorage.getItem('urizen.app.ai')||'null');}catch{return null;}}
+  function detectProvider(k){k=k.trim();if(/^sk-ant-/.test(k))return'anthropic';if(/^sk-or-/.test(k))return'openrouter';if(/^AIza/.test(k))return'google';if(/^sk-/.test(k))return'openai';return'openrouter';}
+  function showForm(){const a=getAI();aiSaved.style.display='none';aiForm.style.display='block';aiName.value=(a&&a.name)||'';aiKey.value='';aiStatus.textContent='';$('ai-detected').style.display='none';$('ai-cancel').style.display=a&&a.key?'inline-block':'none';}
+  function loadAI(){const a=getAI(); if(a&&a.key){aiSaved.style.display='block';aiForm.style.display='none';$('ai-saved-name').textContent=a.name||'My key';const p=PROV[a.provider]||PROV.openrouter;$('ai-saved-sub').textContent=`${p.name} · ••••${a.last4||''} · pick any ${p.name} model in the chat`;} else showForm(); buildModelMenu();}
+  aiKey.addEventListener('input',()=>{const k=aiKey.value.trim();if(!k){$('ai-detected').style.display='none';return;}const p=detectProvider(k);aiProv.value=p;$('ai-detected').style.display='block';$('ai-detected').innerHTML=`detected: <b style="color:#34F003">${PROV[p].name}</b> — you'll be able to pick any ${PROV[p].name} model in the chat`;});
+  $('ai-save').addEventListener('click',()=>{const key=aiKey.value.trim();if(!key){aiStatus.textContent='paste a key first';return;}const provider=detectProvider(key);const cfg={provider,key,name:aiName.value.trim()||(PROV[provider].name+' key'),last4:key.slice(-4)};localStorage.setItem('urizen.app.ai',JSON.stringify(cfg));localStorage.removeItem('urizen.app.chatmodel');ensureTerminal(()=>dispatch('urizen:setkey',{key,model:(MODELS[provider]||[['']])[0][0]}));loadAI();});
+  $('ai-change').addEventListener('click',showForm);
+  $('ai-cancel').addEventListener('click',loadAI);
+  $('ai-clear').addEventListener('click',()=>{localStorage.removeItem('urizen.app.ai');localStorage.removeItem('urizen.app.chatmodel');showForm();buildModelMenu();});
+  $('reset-onb').addEventListener('click',()=>{ if(window.urizen&&window.urizen.resetOnboarding)window.urizen.resetOnboarding(); $('reset-onb').textContent='will show on next launch ✓';});
+
+  // ── chat model picker (provider logos) — driven by whatever key is set (or free) ──
+  // each model shows ITS brand's mark (inline SVG — always renders, no network). Colored badge per brand.
+  const BRANDS={anthropic:'#d97757',openai:'#000',openrouter:'#6566f1',free:'#34F003'};
+  // Real brand marks. Anthropic/OpenAI/OpenRouter/Free = crisp official inline SVG (the exact paths the
+  // terminal uses). The labs without a clean single-path mark (xAI, Gemini, DeepSeek, Meta, Mistral, Qwen)
+  // render their REAL logo file, bundled locally in assets/logos so it works offline.
+  const MARK={
+    anthropic:'<svg viewBox="0 0 24 24" fill="#fff" fill-rule="evenodd"><path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z"/></svg>',
+    openai:'<svg viewBox="0 0 256 260" fill="#fff"><path d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483ZM142.626 236.782a48.4 48.4 0 0 1-31.104-11.254l1.535-.87 51.67-29.826a8.6 8.6 0 0 0 4.247-7.366v-72.85l21.845 12.636a.8.8 0 0 1 .41.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601l-.007-.001Zm-104.466-44.61a48.34 48.34 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.34 8.34 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803l-.007-.001v.005Zm-13.614-113.11a48.5 48.5 0 0 1 25.578-21.333l-.012 1.803v59.65a8.29 8.29 0 0 0 4.195 7.316l63.079 36.425-21.845 12.636a.82.82 0 0 1-.768.051L47.28 145.516a48.6 48.6 0 0 1-22.735-66.404l-.007-.005.006-.02Zm179.466 41.695-63.08-36.63 21.847-12.583a.82.82 0 0 1 .768-.051l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.5 8.5 0 0 0-4.4-7.213l-.052.049.001-.02Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L82.099 129.71v-25.221a.72.72 0 0 1 .307-.665l52.233-30.133a48.6 48.6 0 0 1 72.236 50.339l-.052.021.001.001Zm-136.86 44.933-21.845-12.636a.87.87 0 0 1-.41-.563V103.86a48.6 48.6 0 0 1 79.657-37.318l-1.535.87-51.67 29.825a8.6 8.6 0 0 0-4.246 7.367l-.052 72.749.052-.001-.001.002Z"/></svg>',
+    openrouter:'<svg viewBox="0 0 512 512" fill="none" stroke="#fff"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z" fill="#fff"/><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z" fill="#fff"/></svg>',
+    free:'<svg viewBox="0 0 24 24" fill="#04140a"><path d="M12 2l2.9 7.5L22 11l-7.1 1.6L12 20l-2.9-7.4L2 11l7.1-1.5z"/></svg>'
+  };
+  // brands rendered from their real logo image (filename in assets/logos)
+  const IMG={x:'xai.ico',gemini:'google.ico',deepseek:'deepseek.ico',meta:'meta.ico',mistral:'mistral.ico',qwen:'qwen.png'};
+  function brandOf(id,prov){if(prov==='free')return'free';const s=(id||'').toLowerCase();if(s.includes('claude')||s.includes('anthropic')||prov==='anthropic')return'anthropic';if(s.includes('grok')||s.includes('x-ai'))return'x';if(s.includes('gemini')||s.includes('google')||prov==='google')return'gemini';if(s.includes('deepseek'))return'deepseek';if(s.includes('llama')||s.includes('meta'))return'meta';if(s.includes('mistral'))return'mistral';if(s.includes('qwen'))return'qwen';if(s.includes('gpt')||s.includes('/o1')||s.includes('o3')||s.includes('openai')||prov==='openai')return'openai';return'openrouter';}
+  function setBadge(el,brand){
+    if(IMG[brand]){ el.style.background='#fff'; el.style.padding='0'; el.innerHTML=`<img src="assets/logos/${IMG[brand]}" style="width:80%;height:80%;object-fit:contain;border-radius:2px" onerror="this.parentNode.style.background='${BRANDS.openrouter}';this.replaceWith()"/>`; }
+    else { el.style.background=BRANDS[brand]||BRANDS.openrouter; el.innerHTML=MARK[brand]||MARK.openrouter; el.style.padding=(brand==='anthropic'||brand==='openai')?'2px':'0'; }
+  }
+  function chatModels(){const a=getAI();if(a&&a.key)return (MODELS[a.provider]||[]).map(([id,l])=>[id,l,a.provider]);return FREE.map(([id,l])=>[id,l,'free']);}
+  function getChatModel(){const list=chatModels();const saved=localStorage.getItem('urizen.app.chatmodel');const found=list.find(m=>m[0]===saved);return found||list[0];}
+  function setChatModel(id){localStorage.setItem('urizen.app.chatmodel',id);buildModelMenu();}
+  function buildModelMenu(){const list=chatModels();const cur=getChatModel();setBadge($('mp-badge'),brandOf(cur[0],cur[2]));$('mp-label').textContent=cur[1];const menu=$('mp-menu');menu.innerHTML=list.map(([id,l,prov])=>`<div class="mp-item ${id===cur[0]?'sel':''}" data-id="${id}"><span class="mp-badge" data-b="${brandOf(id,prov)}"></span><span>${l}</span></div>`).join('');menu.querySelectorAll('.mp-item').forEach(it=>{setBadge(it.querySelector('.mp-badge'),it.querySelector('.mp-badge').dataset.b);it.onclick=()=>{setChatModel(it.dataset.id);menu.classList.remove('on');};});}
+  $('mp-btn').addEventListener('click',e=>{e.stopPropagation();$('mp-menu').classList.toggle('on');});
+  document.addEventListener('click',()=>$('mp-menu').classList.remove('on'));
+  buildModelMenu();
+
+  const H=new Date().getHours();
+  document.getElementById('greeting').textContent=(H<5?'Burning the midnight oil':H<12?'Good morning':H<18?'Good afternoon':'Good evening')+', trader';
+  const chipsEl=document.getElementById('chips');
+  ['How\'s NVDA looking?','Is TSLA a buy here?','What\'s moving today?','Explain BTC funding'].forEach(c=>{const b=document.createElement('div');b.className='chip';b.textContent=c;b.onclick=()=>send(c);chipsEl.appendChild(b);});
+
+  const j=u=>fetch(u).then(r=>r.json()).catch(()=>null);
+  const detectSymbol=t=>{const up=t.toUpperCase();for(const k of KNOWN)if(new RegExp('\\b'+k+'\\b').test(up))return k;const m=up.match(/\b[A-Z]{2,5}\b/);return m?m[0]:null;};
+  function md(s){ s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); const lines=s.split('\n');let out='',inl=false; const cl=()=>{if(inl){out+='</ul>';inl=false;}};
+    for(let l of lines){ l=l.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+      if(/^##\s/.test(l)){cl();out+='<h2>'+l.replace(/^##\s/,'')+'</h2>';}
+      else if(/^[-*]\s/.test(l)){if(!inl){out+='<ul>';inl=true;}out+='<li>'+l.replace(/^[-*]\s/,'')+'</li>';}
+      else if(!l.trim()){cl();}
+      else{cl();out+='<p>'+l+'</p>';} } cl(); return out; }
+  const AV='<div class="av"><svg viewBox="0 0 580 696"><path d="M 456 696 L 318 558 L 178 696 L 0 517 L 2 166 L 180 0 L 182 453 L 276 546 L 278 166 L 458 1 L 458 453 L 580 574 Z"/></svg></div>';
+  function addMsg(role,html){ const d=document.createElement('div'); d.className='msg '+(role==='u'?'u':'a'); d.innerHTML=(role==='a'?AV:'')+'<div class="bub">'+html+'</div>'; msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; return d.querySelector('.bub'); }
+  const slogo=s=>`https://financialmodelingprep.com/image-stock/${s}.png`;
+  // returns the chart HTML to embed INSIDE the agent's message bubble (no separate floating card → no overlap)
+  function chartHTML(sym,closes,chg){ const W=520,Hh=120,lo=Math.min(...closes),hi=Math.max(...closes),sp=hi-lo||1; const pts=closes.map((v,i)=>`${(i/(closes.length-1))*W},${(Hh-8)-((v-lo)/sp)*(Hh-16)}`); const up=chg>=0,col=up?'#34F003':'#ff5a5a'; const area=`M0,${Hh} L${pts.join(' L')} L${W},${Hh} Z`; const last=closes[closes.length-1];
+    return `<div class="cchart"><div class="cc-head"><img src="${slogo(sym)}" onerror="this.style.display='none'"/><span class="cc-sym">${sym}</span><span class="cc-price">$${last.toLocaleString(undefined,{maximumFractionDigits:2})}</span><span class="cc-chg ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</span></div><svg class="cc-svg" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none"><defs><linearGradient id="g${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity="0.28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#g${sym})"/><polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/></svg></div>`; }
+  // skills — shape what the agent does
+  const SKILLS=[['chart','Charts',true],['news','Headlines',false],['deep','Deep dive',false]];
+  const active={chart:true};
+  const skillsEl=document.getElementById('skills');
+  SKILLS.forEach(([id,label,on])=>{const b=document.createElement('div');b.className='skill'+(on?' on':'');b.dataset.id=id;b.innerHTML=`<span>${label}</span>`;if(on)active[id]=true;b.onclick=()=>{active[id]=!active[id];b.classList.toggle('on',active[id]);};skillsEl.appendChild(b);});
+  function toggleSkill(id){active[id]=!active[id];const b=skillsEl.querySelector('[data-id="'+id+'"]');if(b)b.classList.toggle('on',active[id]);toast((active[id]?'Enabled ':'Disabled ')+(SKILLS.find(s=>s[0]===id)||[,id])[1]);}
+  function clearChat(){convo.length=0;[...msgs.querySelectorAll('.msg')].forEach(m=>m.remove());chat.classList.add('empty');}
+
+  // ── "/" command palette — skills & actions, like the terminal. Type "/" in the chat to open. ──
+  const slashEl=$('slash');
+  const COMMANDS=[
+    {cmd:'/charts',icon:'📈',desc:'Toggle live charts in replies',tag:'skill',run:()=>toggleSkill('chart')},
+    {cmd:'/headlines',icon:'📰',desc:'Weave in the latest news',tag:'skill',run:()=>toggleSkill('news')},
+    {cmd:'/deep',icon:'🧠',desc:'Deep, structured analysis',tag:'skill',run:()=>toggleSkill('deep')},
+    {cmd:'/research',icon:'🔬',desc:'Open the multi-desk research',tag:'go',run:()=>showView('research')},
+    {cmd:'/connectors',icon:'🔌',desc:'Data feeds & MCP servers',tag:'go',run:()=>showConnectors()},
+    {cmd:'/model',icon:'✦',desc:'Switch the AI model',tag:'action',run:()=>{$('mp-menu').classList.add('on');}},
+    {cmd:'/spot',icon:'💵',desc:'Spot trading (opens browser)',tag:'go',run:()=>showView('spot')},
+    {cmd:'/perps',icon:'⚡',desc:'Perps trading (opens browser)',tag:'go',run:()=>showView('perps')},
+    {cmd:'/files',icon:'📄',desc:'Analyse a trades CSV',tag:'go',run:()=>showFiles()},
+    {cmd:'/clear',icon:'🗑',desc:'Clear this conversation',tag:'action',run:()=>clearChat()},
+  ];
+  let slashSel=0, slashList=[];
+  function slashOpen(){return slashEl.classList.contains('on');}
+  function renderSlash(qtext){
+    const term=qtext.slice(1).toLowerCase();
+    slashList=COMMANDS.filter(c=>c.cmd.slice(1).startsWith(term)||c.desc.toLowerCase().includes(term));
+    if(!slashList.length){slashEl.classList.remove('on');return;}
+    if(slashSel>=slashList.length)slashSel=0;
+    slashEl.innerHTML='<div class="slash-head">Commands</div>'+slashList.map((c,i)=>`<div class="slash-item ${i===slashSel?'sel':''}" data-i="${i}"><span class="si">${c.icon}</span><span class="sc">${c.cmd}</span><span class="sd">${c.desc}</span><span class="sx">${c.tag}</span></div>`).join('');
+    slashEl.querySelectorAll('.slash-item').forEach(el=>{el.onmouseenter=()=>{slashSel=+el.dataset.i;highlightSlash();};el.onclick=()=>runSlash(+el.dataset.i);});
+    slashEl.classList.add('on');
+  }
+  function highlightSlash(){slashEl.querySelectorAll('.slash-item').forEach((el,i)=>el.classList.toggle('sel',i===slashSel));}
+  function runSlash(i){const c=slashList[i];if(!c)return;slashEl.classList.remove('on');q.value='';try{c.run();}catch(_){}}
+  function closeSlash(){slashEl.classList.remove('on');}
+  q.addEventListener('input',()=>{const v=q.value;if(v.startsWith('/')){slashSel=0;renderSlash(v);}else closeSlash();});
+
+  const convo=[];
+  async function send(text){
+    text=(text||'').trim(); if(!text) return;
+    chat.classList.remove('empty'); q.value='';
+    addMsg('u', text.replace(/</g,'&lt;'));
+    convo.push({role:'user',content:text});
+    // ground with live data; the agent "opens" a chart that lives INSIDE its reply bubble (no overlap)
+    let ctx='', chartStr='';
+    const sym=detectSymbol(text);
+    if(sym){
+      // only pull the feeds the user has enabled in Connectors
+      const wantMkt=connEnabled('market'),wantFund=connEnabled('fundamentals'),wantRate=connEnabled('ratings');
+      const [o,f,r]=await Promise.all([
+        wantMkt?j(`${API}/api/quant/ohlc?symbol=${sym}&interval=1h`):null,
+        wantFund?j(`${API}/api/quant/fundamentals?symbol=${sym}`):null,
+        wantRate?j(`${API}/api/quant/ratings?symbol=${sym}`):null,
+      ]);
+      const c=(o&&o.candles)||[]; if(c.length>2){const cl=c.slice(-48).map(k=>k.c),last=cl[cl.length-1],chg=((last/cl[0])-1)*100,ma=cl.slice(-20).reduce((a,k)=>a+k,0)/Math.min(20,cl.length); ctx+=`${sym} last $${last.toFixed(2)}, 48h ${chg.toFixed(1)}%, ${last>ma?'above':'below'} 20MA. `; if(active.chart) chartStr=chartHTML(sym,cl,chg);}
+      if(f&&f.latest){const L=f.latest; ctx+=`Revenue ${(L.revenue/1e9).toFixed(1)}B, net margin ${((L.netMargin||0)*100).toFixed(1)}%, EPS $${Number(L.eps||0).toFixed(2)}. `;}
+      if(r&&(r.consensus||r.rating)) ctx+=`Analyst consensus ${r.consensus||r.rating}${r.targetMean?`, target $${r.targetMean}`:''}. `; }
+    // surface which connectors are live so the agent knows its toolset (built-in feeds + your MCP servers)
+    const liveFeeds=CONNECTORS.filter(c=>connEnabled(c.id)).map(c=>c.name);
+    const mcpNames=getMCP().map(m=>m.name);
+    const connNote=[...liveFeeds,...mcpNames].length?`\n\n[active connectors: ${[...liveFeeds,...mcpNames].join(', ')}]`:'';
+    const bub=addMsg('a', chartStr + '<div class="typing"><span></span><span></span><span></span></div>');
+    const msgsPayload=convo.slice(-10);
+    if(ctx||connNote) msgsPayload[msgsPayload.length-1]={role:'user',content:`${text}${ctx?`\n\n[live data — use these exact numbers: ${ctx}]`:''}${connNote}`};
+    const deep=active.deep;
+    try{
+      const ai=getAI(); const cm=getChatModel(); const payload={messages:msgsPayload,maxTokens:deep?1600:1000,model:cm[0],stream:true};
+      if(deep)payload.system='You are Urizen, a markets analyst. Give a THOROUGH, structured answer with clear sections and the exact numbers. No disclaimers.';
+      if(ai&&ai.key){payload.provider=ai.provider;payload.key=ai.key;}
+      const res=await fetch(`${API}/api/home/ask`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+      const ct=res.headers.get('content-type')||'';
+      if(ct.includes('event-stream')&&res.body){
+        const reader=res.body.getReader(),dec=new TextDecoder();let buf='',full='';
+        for(;;){const{done,value}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop()||'';for(const line of lines){const l=line.trim();if(!l.startsWith('data:'))continue;const data=l.slice(5).trim();if(!data||data==='[DONE]')continue;try{const p=JSON.parse(data);const delta=(p.choices&&p.choices[0]&&p.choices[0].delta&&p.choices[0].delta.content)||(p.type==='content_block_delta'&&p.delta&&p.delta.text)||'';if(delta){full+=delta;bub.innerHTML=chartStr+md(full)+'<span class="cursor">▋</span>';msgs.scrollTop=msgs.scrollHeight;}}catch(_){}}}
+        bub.innerHTML=chartStr+md(full||'The desk is busy — try again.');convo.push({role:'assistant',content:full});
+      } else { const d=await res.json(); const t=d.text||d.error||'The free desk is busy — try again in a moment.'; bub.innerHTML=chartStr+md(t); convo.push({role:'assistant',content:t}); }
+      msgs.scrollTop=msgs.scrollHeight;
+    }catch{ bub.innerHTML=chartStr+'Couldn\'t reach the desk. Check your connection and try again.'; }
+  }
+  document.getElementById('go').addEventListener('click',()=>send(q.value));
+  q.addEventListener('keydown',e=>{
+    if(slashOpen()){
+      if(e.key==='ArrowDown'){e.preventDefault();slashSel=(slashSel+1)%slashList.length;highlightSlash();return;}
+      if(e.key==='ArrowUp'){e.preventDefault();slashSel=(slashSel-1+slashList.length)%slashList.length;highlightSlash();return;}
+      if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();runSlash(slashSel);return;}
+      if(e.key==='Escape'){e.preventDefault();closeSlash();return;}
+    }
+    if(e.key==='Enter')send(q.value);
+  });
+
+  // ── microphone → speech-to-text via a LOCAL Whisper model (runs on-device with transformers.js; the
+  //    ~40MB tiny model downloads once, then works fully offline). No audio ever leaves your Mac. ──
+  const micBtn=$('mic'); let asrPipe=null, mediaRec=null, micStream=null, chunks=[], recording=false;
+  async function loadASR(){
+    if(asrPipe) return asrPipe;
+    toast('Loading on-device voice model (one-time ~40MB)…');
+    const t=await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+    t.env.allowLocalModels=false;
+    asrPipe=await t.pipeline('automatic-speech-recognition','Xenova/whisper-tiny.en',{
+      progress_callback:p=>{ if(p&&p.status==='progress'&&/\.onnx/.test(p.file||'')) micBtn.title='downloading voice model '+Math.round(p.progress||0)+'%'; }
+    });
+    return asrPipe;
+  }
+  async function pcm16k(blob){ const buf=await blob.arrayBuffer(); const ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000}); const a=await ac.decodeAudioData(buf); ac.close(); return a.getChannelData(0); }
+  async function startRec(){
+    try{ micStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){ toast('Microphone blocked — allow it in System Settings › Privacy › Microphone'); return; }
+    chunks=[]; mediaRec=new MediaRecorder(micStream); mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    mediaRec.onstop=async()=>{
+      try{ micStream.getTracks().forEach(t=>t.stop()); }catch(_){}
+      micBtn.classList.remove('rec'); micBtn.classList.add('busy');
+      try{
+        const blob=new Blob(chunks,{type:(mediaRec&&mediaRec.mimeType)||'audio/webm'});
+        const pcm=await pcm16k(blob);
+        if(!pcm||pcm.length<2400){ micBtn.classList.remove('busy'); toast('Too short — click the mic, speak, then click again'); return; }
+        const asr=await loadASR(); const out=await asr(pcm); const txt=((out&&out.text)||'').trim();
+        micBtn.classList.remove('busy'); micBtn.title='Speak — local, on-device transcription';
+        if(txt){ q.value=(q.value?q.value.trim()+' ':'')+txt; q.focus(); } else toast('Didn\'t catch that — try again');
+      }catch(err){ micBtn.classList.remove('busy'); console.error('[STT]',err); toast('Voice model needs one online download the first time, then it\'s offline.'); }
+    };
+    mediaRec.start(); recording=true; micBtn.classList.add('rec'); micBtn.title='Recording — click to stop & transcribe';
+  }
+  function stopRec(){ try{ if(mediaRec&&mediaRec.state!=='inactive')mediaRec.stop(); }catch(_){} recording=false; }
+  micBtn.addEventListener('click',()=>{ recording?stopRec():startRec(); });
+
+  // CSV (local)
+  const drop=document.getElementById('drop'),fileIn=document.getElementById('file'),csvout=document.getElementById('csvout');
+  drop.addEventListener('click',()=>fileIn.click());
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer.files[0];if(f)readCSV(f);});
+  fileIn.addEventListener('change',()=>{if(fileIn.files[0])readCSV(fileIn.files[0]);});
+  function readCSV(file){const r=new FileReader();r.onload=()=>analyzeCSV(r.result,file.name);r.readAsText(file);}
+  function analyzeCSV(text,name){ const lines=text.split(/\r?\n/).filter(x=>x.trim()); if(lines.length<2){csvout.innerHTML='<div class="box" style="margin-top:22px"><div class="muted">Couldn\'t read any rows.</div></div>';return;}
+    const head=lines[0].split(',').map(h=>h.trim().toLowerCase()); const idx=(...n)=>{for(const x of n){const i=head.indexOf(x);if(i>=0)return i;}return -1;};
+    const iSym=idx('symbol','ticker','asset'),iPnl=idx('pnl','pnl_usd','profit','realized_pnl','p&l');
+    const rows=lines.slice(1).map(l=>l.split(',')); let trades=0,wins=0,total=0;const bySym={};
+    rows.forEach(r=>{if(!r.length)return;trades++;const s=iSym>=0?(r[iSym]||'').trim().toUpperCase():'—';const p=iPnl>=0?parseFloat(r[iPnl]):NaN; if(isFinite(p)){total+=p;if(p>0)wins++;bySym[s]=(bySym[s]||0)+p;}});
+    const top=Object.entries(bySym).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    csvout.innerHTML=`<div style="margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="box"><h3 class="bh">▤ ${name}</h3><div class="big ${total>=0?'up':'down'}">${total>=0?'+':'−'}$${Math.abs(total).toLocaleString(undefined,{maximumFractionDigits:2})}</div><div class="muted" style="margin-top:4px">net P&L across ${trades} rows</div></div>
+      <div class="box"><h3 class="bh">◑ stats</h3><div class="row"><span>Trades</span><span>${trades}</span></div><div class="row"><span>Win rate</span><span>${iPnl>=0?Math.round(wins/Math.max(1,trades)*100)+'%':'n/a'}</span></div><div class="row"><span>Avg P&L</span><span>${iPnl>=0?'$'+(total/Math.max(1,trades)).toFixed(2):'n/a'}</span></div></div>
+      ${top.length?`<div class="box" style="grid-column:1/-1"><h3 class="bh">▦ by symbol</h3>${top.map(([s,v])=>`<div class="row"><span style="font-weight:600">${s}</span><span class="${v>=0?'up':'down'}">${v>=0?'+':'−'}$${Math.abs(v).toFixed(2)}</span></div>`).join('')}</div>`:''}
+    </div>`; }
+
+  // ── Connectors — data feeds the agent grounds in + custom MCP servers. All stored on the Mac. ──
+  const CONNECTORS=[
+    {id:'market',icon:'📈',name:'Market Data',desc:'Live prices, OHLC candles & charts',def:true},
+    {id:'fundamentals',icon:'📊',name:'Fundamentals',desc:'Revenue, margins, EPS, valuation',def:true},
+    {id:'ratings',icon:'⭐',name:'Analyst Ratings',desc:'Consensus & price targets',def:true},
+    {id:'news',icon:'📰',name:'News & Headlines',desc:'Real-time market headlines',def:false},
+    {id:'onchain',icon:'⛓️',name:'On-chain',desc:'DEX liquidity, holders & flows',def:false},
+    {id:'filings',icon:'📄',name:'SEC Filings',desc:'EDGAR 10-K / 10-Q / 8-K',def:false},
+    {id:'research',icon:'🔎',name:'Web Research',desc:'Live web search across sources',def:false},
+    {id:'macro',icon:'🌐',name:'Macro & Rates',desc:'CPI, Fed, yields, DXY',def:false},
+  ];
+  function connState(){ try{return JSON.parse(localStorage.getItem('urizen.app.connectors')||'null')||{};}catch{return{};} }
+  function connEnabled(id){ const s=connState(); if(id in s)return !!s[id]; const c=CONNECTORS.find(c=>c.id===id); return c?c.def:false; }
+  function setConn(id,on){ const s=connState(); s[id]=on; localStorage.setItem('urizen.app.connectors',JSON.stringify(s)); }
+  function getMCP(){ try{return JSON.parse(localStorage.getItem('urizen.app.mcp')||'[]');}catch{return[];} }
+  function setMCP(list){ localStorage.setItem('urizen.app.mcp',JSON.stringify(list)); }
+  function renderConnectors(){
+    const grid=$('conn-grid');
+    grid.innerHTML=CONNECTORS.map(c=>`<div class="cc ${connEnabled(c.id)?'on':''}" data-id="${c.id}"><span class="ci">${c.icon}</span><div><div class="cn">${c.name}</div><div class="cd">${c.desc}</div></div><span class="sw"></span></div>`).join('');
+    grid.querySelectorAll('.cc').forEach(el=>el.onclick=()=>{const id=el.dataset.id;const on=!connEnabled(id);setConn(id,on);el.classList.toggle('on',on);});
+    const list=$('mcp-list'),m=getMCP();
+    list.innerHTML=m.length?m.map((s,i)=>`<div class="mcp-row"><span class="ci" style="font-size:16px">🔌</span><div class="md"><div class="mn">${(s.name||'MCP').replace(/</g,'&lt;')}</div><div class="mu">${(s.url||'').replace(/</g,'&lt;')}${s.key?' · 🔑':''} · ${s.kind||'http'}</div></div><button class="ghost mcp-del" data-i="${i}">Remove</button></div>`).join(''):'<div class="muted" style="margin-bottom:12px">No custom connectors yet — add one below.</div>';
+    list.querySelectorAll('.mcp-del').forEach(b=>b.onclick=()=>{const arr=getMCP();arr.splice(+b.dataset.i,1);setMCP(arr);renderConnectors();toast('Connector removed');});
+  }
+  $('mcp-add').addEventListener('click',()=>{
+    const name=$('mcp-name').value.trim(),url=$('mcp-url').value.trim(),kind=$('mcp-kind').value,key=$('mcp-key').value.trim();
+    if(!name||!url){$('mcp-status').textContent='name + endpoint required';return;}
+    const arr=getMCP();arr.push({name,url,kind,key:key?'••••'+key.slice(-4):'',enabled:true});setMCP(arr);
+    $('mcp-name').value='';$('mcp-url').value='';$('mcp-key').value='';$('mcp-status').textContent='';renderConnectors();toast('Connector added — the agent can use it');
+  });
+  document.addEventListener('click',e=>{const s=e.target.closest('.mcp-sug');if(s){$('mcp-name').value=s.dataset.n;$('mcp-url').value=s.dataset.u;$('mcp-url').focus();}});
+
+  if(window.urizen&&window.urizen.onGoView) window.urizen.onGoView(v=>{if(v==='home')return showHome();if(v==='files')return showFiles();if(v==='connectors')return showConnectors();if(v==='leaderboard')return openPage('leaderboard');showView(v);});
+</script>
+</body>
+</html>

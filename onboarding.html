@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { --signal:#34F003; --ink:#07080a; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { height:100%; background:var(--ink); color:#f4f4f5; overflow:hidden;
+    font-family:-apple-system,"SF Pro Display",system-ui,sans-serif; -webkit-user-select:none; cursor:default; }
+  .drag { position:fixed; top:0; left:0; right:0; height:44px; -webkit-app-region:drag; z-index:60; }
+
+  /* ── Blake "Ancient of Days" — slow ken-burns, breathing, masked & tinted ── */
+  .blake { position:fixed; inset:-6%; z-index:0;
+    background:url('assets/blake-ancient.jpg') center 22% / cover no-repeat;
+    filter:grayscale(1) contrast(1.2) brightness(.62);
+    opacity:0; animation:blakeIn 2.6s cubic-bezier(.2,.8,.2,1) .2s forwards, kenburns 38s ease-in-out 2.6s infinite alternate;
+    -webkit-mask-image:radial-gradient(120% 95% at 66% 30%, #000 26%, transparent 76%); }
+  .blake::after { content:""; position:absolute; inset:0; background:radial-gradient(60% 55% at 66% 24%, rgba(52,240,3,.13), transparent 60%); mix-blend-mode:screen; }
+  @keyframes blakeIn { to { opacity:.26; } }
+  @keyframes kenburns { from { transform:scale(1) translateY(0); } to { transform:scale(1.1) translateY(-1.6%); } }
+  .vign { position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:radial-gradient(130% 100% at 60% 0%, transparent 42%, rgba(0,0,0,.5) 100%),
+               linear-gradient(90deg, rgba(7,8,10,.82) 12%, transparent 55%); }
+
+  /* ── split layout ── */
+  .wrap { position:relative; z-index:2; height:100vh; display:flex; align-items:center; }
+  .left { flex:0 0 42%; padding:0 3vw 0 7vw; }
+  .right { flex:1; position:relative; height:100%; perspective:1700px; }
+
+  /* left column: logo · wordmark · caption · controls */
+  .mark { width:56px; height:68px; margin-bottom:22px; overflow:visible; display:block; }
+  .mark path { fill:none; stroke:var(--signal); stroke-width:14; stroke-dasharray:2600; stroke-dashoffset:2600; animation:draw 1.7s cubic-bezier(.6,.05,.2,1) .3s forwards; }
+  .mark.lit path { fill:var(--signal); transition:fill .8s ease; }
+  .mark { animation:glow 3.6s ease-in-out 2.2s infinite; }
+  @keyframes draw { to { stroke-dashoffset:0; } }
+  @keyframes glow { 0%,100%{filter:drop-shadow(0 0 9px rgba(52,240,3,.32))} 50%{filter:drop-shadow(0 0 24px rgba(52,240,3,.68))} }
+  .word { font-size:38px; font-weight:800; letter-spacing:.01em; opacity:0; animation:up .8s cubic-bezier(.2,.8,.2,1) 1s forwards; }
+  .word b { color:var(--signal); }
+  .cap { margin-top:16px; height:86px; position:relative; max-width:400px; }
+  .cap .line { position:absolute; inset:0; opacity:0; transform:translateY(12px); transition:opacity .55s cubic-bezier(.2,.8,.2,1), transform .55s cubic-bezier(.2,.8,.2,1); }
+  .cap .line.on { opacity:1; transform:none; }
+  .cap h2 { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.24em; color:var(--signal); margin-bottom:9px; }
+  .cap p { font-size:16.5px; line-height:1.55; color:#b4b4bb; }
+  @keyframes up { to{opacity:1; transform:none;} }
+  .ctl { margin-top:38px; display:flex; align-items:center; gap:18px; opacity:0; animation:up .8s ease 1.3s forwards; }
+  .dots { display:flex; gap:8px; margin-right:6px; } .dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.17); transition:.3s; } .dot.on { background:var(--signal); width:22px; border-radius:4px; box-shadow:0 0 10px rgba(52,240,3,.6); }
+  .btn { -webkit-app-region:no-drag; border:1px solid rgba(52,240,3,.45); cursor:pointer; background:rgba(52,240,3,.14); color:var(--signal); padding:12px 26px; border-radius:13px; font:700 12.5px -apple-system; text-transform:uppercase; letter-spacing:.13em; transition:.2s; }
+  .btn:hover { background:rgba(52,240,3,.26); box-shadow:0 0 26px -6px rgba(52,240,3,.5); }
+  .ghost { -webkit-app-region:no-drag; background:none; border:none; color:#6b6b70; cursor:pointer; font:500 12px -apple-system; text-transform:uppercase; letter-spacing:.13em; padding:12px 4px; } .ghost:hover { color:#a1a1aa; }
+
+  /* ── 3D window deck (right) ── */
+  .deck { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.2,1); }
+  .slot { position:absolute; transform-style:preserve-3d; }
+  .s-chat  { left:20%; top:32%; animation:float1 9s ease-in-out 2.4s infinite; }
+  .s-chart { left:2%;  top:60%; animation:float2 11s ease-in-out 2.4s infinite; }
+  .s-conn  { left:56%; top:14%; animation:float3 10s ease-in-out 2.4s infinite; }
+  @keyframes float1 { 0%,100%{transform:translateZ(60px) rotateY(-11deg) rotateX(3deg) translateY(0)} 50%{transform:translateZ(60px) rotateY(-11deg) rotateX(3deg) translateY(-12px)} }
+  @keyframes float2 { 0%,100%{transform:translateZ(-50px) rotateY(13deg) rotateX(4deg) translateY(0)} 50%{transform:translateZ(-50px) rotateY(13deg) rotateX(4deg) translateY(10px)} }
+  @keyframes float3 { 0%,100%{transform:translateZ(-80px) rotateY(-16deg) rotateX(5deg) translateY(0)} 50%{transform:translateZ(-80px) rotateY(-16deg) rotateX(5deg) translateY(-8px)} }
+
+  .win { border-radius:16px; overflow:hidden; backface-visibility:hidden;
+    background:linear-gradient(160deg, rgba(24,26,30,.94), rgba(11,12,15,.94));
+    border:1px solid rgba(255,255,255,.09); box-shadow:0 40px 90px -30px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter:blur(10px);
+    opacity:0; animation:winIn .95s cubic-bezier(.2,.85,.25,1) forwards; }
+  .s-chart .win{animation-delay:1.5s} .s-chat .win{animation-delay:1.8s} .s-conn .win{animation-delay:2.1s}
+  @keyframes winIn { from{opacity:0; transform:translateX(46px) translateY(10px) scale(.95)} to{opacity:1; transform:none} }
+  .win .bar { height:26px; display:flex; align-items:center; gap:6px; padding:0 11px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .win .bar i { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.16); }
+  .win .bar i:first-child{background:#ff5f57} .win .bar i:nth-child(2){background:#febc2e} .win .bar i:nth-child(3){background:#28c840}
+  .win .bar span { margin-left:6px; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#6b6b70; }
+  .win .body { padding:14px; }
+
+  .w-chat { width:360px; } .w-chart { width:300px; } .w-conn { width:250px; }
+  .bub { max-width:80%; padding:8px 11px; border-radius:13px; font-size:12.5px; line-height:1.5; margin-bottom:9px; opacity:0; }
+  .bub.u { margin-left:auto; background:rgba(52,240,3,.14); border:1px solid rgba(52,240,3,.28); color:#eafff0; border-bottom-right-radius:4px; animation:bubIn .5s ease 2.5s forwards; }
+  .bub.a { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); color:#dcdce0; border-bottom-left-radius:4px; position:relative; }
+  .bub.a b { color:var(--signal); }
+  /* agent reply "streams" in via a wipe */
+  .bub.a1 { animation:bubIn .5s ease 3s forwards; } .bub.a1 .txt{ clip-path:inset(0 100% 0 0); animation:wipe 1.1s steps(24) 3.15s forwards; display:block; }
+  .bub.a2 { animation:bubIn .4s ease 4.3s forwards; }
+  @keyframes bubIn { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+  @keyframes wipe { to{clip-path:inset(0 0 0 0)} }
+  .type i{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--signal);margin:0 1.5px;animation:blink 1.2s infinite both} .type i:nth-child(2){animation-delay:.2s}.type i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+  .w-chart .head { display:flex; align-items:center; gap:8px; margin-bottom:8px; } .w-chart .sym{font-weight:700;font-size:13px} .w-chart .px{margin-left:auto;font-variant-numeric:tabular-nums;font-size:12.5px} .w-chart .chg{color:var(--signal);font-size:11px;font-weight:600}
+  .cline { stroke-dasharray:360; stroke-dashoffset:360; animation:drawline 1.5s cubic-bezier(.5,0,.3,1) 2.3s forwards; }
+  .carea { opacity:0; animation:fadein .8s ease 3.2s forwards; }
+  @keyframes drawline { to{stroke-dashoffset:0} } @keyframes fadein { to{opacity:1} }
+
+  .crow { display:flex; align-items:center; gap:9px; padding:7px 2px; }
+  .crow .ci{font-size:14px} .crow .cn{font-size:11.5px;color:#d4d4d8} .crow .sw{margin-left:auto;width:26px;height:15px;border-radius:99px;background:rgba(255,255,255,.08);position:relative;transition:background .3s} .crow .sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#8a8a90;transition:transform .35s cubic-bezier(.3,1.4,.5,1), background .3s}
+  .crow.lit .sw{background:rgba(52,240,3,.28)} .crow.lit .sw::after{transform:translateX(11px);background:var(--signal)}
+
+  /* ── exit loader ── */
+  .loader { position:fixed; inset:0; z-index:80; background:var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; opacity:0; pointer-events:none; transition:opacity .5s; }
+  .loader.on { opacity:1; pointer-events:auto; }
+  .loader svg { width:46px; height:56px; filter:drop-shadow(0 0 20px rgba(52,240,3,.6)); animation:breathe 1.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{opacity:.9;transform:translateY(0)} 50%{opacity:.5;transform:translateY(-3px)} }
+  .loader .track { width:150px; height:2px; background:rgba(255,255,255,.09); border-radius:2px; overflow:hidden; }
+  .loader .track i { display:block; height:100%; width:40%; background:var(--signal); border-radius:2px; animation:slide 1.1s cubic-bezier(.4,0,.2,1) infinite; }
+  @keyframes slide { 0%{transform:translateX(-130%)} 100%{transform:translateX(330%)} }
+  .loader .cap2 { font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:#6b6b70; }
+
+  @media (prefers-reduced-motion: reduce) { *{animation-duration:.01ms !important; animation-iteration-count:1 !important; animation-delay:0s !important} .blake{opacity:.22} .cline{stroke-dashoffset:0} .bub{opacity:1} .bub.a1 .txt{clip-path:none} }
+</style>
+</head>
+<body>
+  <div class="drag"></div>
+  <div class="blake"></div>
+  <div class="vign"></div>
+
+  <div class="wrap">
+    <div class="left">
+      <svg class="mark" id="mark" viewBox="0 0 580 696"><path d="M 456 696 L 318 558 L 178 696 L 0 517 L 2 166 L 180 0 L 182 453 L 276 546 L 278 166 L 458 1 L 458 453 L 580 574 Z"/></svg>
+      <div class="word">Uri<b>zen</b></div>
+      <div class="cap" id="cap">
+        <div class="line on" data-i="0"><p>The AI-native trading desk.</p></div>
+        <div class="line" data-i="1"><h2>Trade · Research · Talk</h2><p>Spot & perps on Robinhood Chain, with an agent that reads the tape with you.</p></div>
+        <div class="line" data-i="2"><h2>Yours, end to end</h2><p>Self-custodial. Any model. Speak to it — transcribed on your Mac.</p></div>
+      </div>
+      <div class="ctl">
+        <div class="dots"><span class="dot on"></span><span class="dot"></span><span class="dot"></span></div>
+        <button class="btn" id="next">Continue</button>
+        <button class="ghost" id="skip">Skip</button>
+      </div>
+    </div>
+
+    <div class="right"><div class="deck" id="deck">
+      <div class="slot s-chart"><div class="win w-chart">
+        <div class="bar"><i></i><i></i><i></i><span>chart</span></div>
+        <div class="body">
+          <div class="head"><span class="sym">NVDA</span><span class="px">$183.20</span><span class="chg">▲ 2.4%</span></div>
+          <svg viewBox="0 0 270 96" preserveAspectRatio="none" style="width:100%;height:96px">
+            <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34F003" stop-opacity=".3"/><stop offset="1" stop-color="#34F003" stop-opacity="0"/></linearGradient></defs>
+            <path class="carea" d="M0,74 L30,66 L60,70 L90,52 L120,58 L150,40 L180,44 L210,26 L240,32 L270,14 L270,96 L0,96 Z" fill="url(#g)"/>
+            <polyline class="cline" points="0,74 30,66 60,70 90,52 120,58 150,40 180,44 210,26 240,32 270,14" fill="none" stroke="#34F003" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div></div>
+
+      <div class="slot s-chat"><div class="win w-chat">
+        <div class="bar"><i></i><i></i><i></i><span>urizen · agent</span></div>
+        <div class="body">
+          <div class="bub u">Is NVDA a buy into earnings?</div>
+          <div class="bub a a1"><span class="txt">NVDA's <b>+2.4%</b>, holding above the 20-MA with momentum building. Setup favors a <b>long</b> — want me to draw the levels?</span></div>
+          <div class="bub a a2"><span class="type"><i></i><i></i><i></i></span></div>
+        </div>
+      </div></div>
+
+      <div class="slot s-conn"><div class="win w-conn">
+        <div class="bar"><i></i><i></i><i></i><span>connectors</span></div>
+        <div class="body">
+          <div class="crow" data-lit="1"><span class="ci">📈</span><span class="cn">Market Data</span><span class="sw"></span></div>
+          <div class="crow" data-lit="1"><span class="ci">📊</span><span class="cn">Fundamentals</span><span class="sw"></span></div>
+          <div class="crow" data-lit="1"><span class="ci">⭐</span><span class="cn">Analyst Ratings</span><span class="sw"></span></div>
+          <div class="crow"><span class="ci">📄</span><span class="cn">SEC Filings</span><span class="sw"></span></div>
+          <div class="crow"><span class="ci">🔌</span><span class="cn">Your MCP</span><span class="sw"></span></div>
+        </div>
+      </div></div>
+    </div></div>
+  </div>
+
+  <div class="loader" id="loader">
+    <svg viewBox="0 0 580 696" fill="#34F003"><path d="M 456 696 L 318 558 L 178 696 L 0 517 L 2 166 L 180 0 L 182 453 L 276 546 L 278 166 L 458 1 L 458 453 L 580 574 Z"/></svg>
+    <div class="track"><i></i></div>
+    <div class="cap2">entering the desk</div>
+  </div>
+
+<script>
+  // light the logo fill after the stroke draws
+  setTimeout(() => document.getElementById('mark').classList.add('lit'), 1900);
+  // flip the "on" connectors sequentially, after the connectors window has flown in
+  const litRows = [...document.querySelectorAll('.crow[data-lit]')];
+  litRows.forEach((r,k) => setTimeout(() => r.classList.add('lit'), 2600 + k*260));
+
+  let i = 0; const n = 3;
+  const lines = [...document.querySelectorAll('.cap .line')];
+  const dots = [...document.querySelectorAll('.dot')];
+  const nextBtn = document.getElementById('next');
+  function render(){
+    lines.forEach(l => l.classList.toggle('on', +l.dataset.i === i));
+    dots.forEach((d,k) => d.classList.toggle('on', k === i));
+    nextBtn.textContent = i === n-1 ? 'Enter the desk →' : 'Continue';
+  }
+  function done(){
+    document.getElementById('loader').classList.add('on');
+    setTimeout(() => { if (window.urizen && window.urizen.completeOnboarding) window.urizen.completeOnboarding(); }, 850);
+  }
+  nextBtn.onclick = () => { if (i < n-1){ i++; render(); } else done(); };
+  document.getElementById('skip').onclick = done;
+  window.addEventListener('keydown', e => { if (e.key==='Enter'||e.key==='ArrowRight') nextBtn.click(); if (e.key==='ArrowLeft' && i>0){ i--; render(); } });
+
+  // subtle 3D parallax — the window deck leans toward the cursor
+  const deck = document.getElementById('deck');
+  window.addEventListener('mousemove', e => {
+    const dx = (e.clientX / window.innerWidth - .5), dy = (e.clientY / window.innerHeight - .5);
+    deck.style.transform = `rotateY(${dx * 9}deg) rotateX(${ -dy * 7}deg)`;
+  });
+</script>
+</body>
+</html>

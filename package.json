@@ -1,0 +1,40 @@
+{
+  "name": "urizen-desktop",
+  "productName": "Urizen",
+  "version": "0.1.0",
+  "description": "Urizen — the on-chain trading desk, as a native macOS app.",
+  "main": "main.js",
+  "author": "Urizen",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "fund.urizen.desktop",
+    "productName": "Urizen",
+    "files": ["main.js", "preload.js", "splash.html", "onboarding.html", "shell.html", "assets/**/*"],
+    "mac": {
+      "category": "public.app-category.finance",
+      "icon": "assets/icon.icns",
+      "target": [{ "target": "dmg", "arch": ["arm64"] }],
+      "darkModeSupport": true,
+      "hardenedRuntime": false,
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Urizen transcribes your voice on-device (local Whisper model) so you can talk to the desk. Audio never leaves your Mac."
+      }
+    },
+    "dmg": {
+      "title": "Urizen",
+      "contents": [
+        { "x": 140, "y": 180 },
+        { "x": 380, "y": 180, "type": "link", "path": "/Applications" }
+      ]
+    }
+  }
+}
