@@ -8,7 +8,7 @@
 
 <br/>
 
-[**⤓ Download for macOS**](https://github.com/0xredwald/urizen-os/releases/latest) &nbsp;·&nbsp; [urizenfund.com](https://urizenfund.com)
+[**⤓ Download for macOS**](https://github.com/0xredwald/urizen-desktop/releases/latest) &nbsp;·&nbsp; [urizenfund.com](https://urizenfund.com)
 
 </div>
 
@@ -27,7 +27,7 @@ Urizen is a native macOS desk for trading tokenized equities and perps on Robinh
 
 ## Download
 
-Grab the latest `.dmg` from the [**releases page**](https://github.com/0xredwald/urizen-os/releases/latest), open it, and drag Urizen to Applications.
+Grab the latest `.dmg` from the [**releases page**](https://github.com/0xredwald/urizen-desktop/releases/latest), open it, and drag Urizen to Applications.
 
 > The build is not yet notarized by Apple. On first launch, right-click the app → **Open** (or allow it under **System Settings → Privacy & Security**). This is a one-time step.
 
